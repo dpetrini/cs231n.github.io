@@ -75,7 +75,13 @@ class TwoLayerNet(object):
     # Store the result in the scores variable, which should be an array of      #
     # shape (N, C).                                                             #
     #############################################################################
-    pass
+    # First W1.X
+    f1 = X.dot(W1)
+    # Activation first layer
+    h = np.maximum(0, f1)
+    # W2 pass
+    scores = h.dot(W2)
+
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -86,6 +92,7 @@ class TwoLayerNet(object):
 
     # Compute the loss
     loss = None
+    loss = np.square(np.sum(scores[y]-y))
     #############################################################################
     # TODO: Finish the forward pass, and compute the loss. This should include  #
     # both the data loss and L2 regularization for W1 and W2. Store the result  #
