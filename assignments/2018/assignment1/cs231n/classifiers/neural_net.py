@@ -90,6 +90,13 @@ class TwoLayerNet(object):
     if y is None:
       return scores
 
+    #############################################################################
+    # TODO: Finish the forward pass, and compute the loss. This should include  #
+    # both the data loss and L2 regularization for W1 and W2. Store the result  #
+    # in the variable loss, which should be a scalar. Use the Softmax           #
+    # classifier loss.                                                          #
+    #############################################################################
+
     # Compute the loss
     loss = None
     num_classes = W2.shape[1]
@@ -106,13 +113,6 @@ class TwoLayerNet(object):
     loss+=reg*np.sum(W2*W2)
     loss+=reg*np.sum(W1*W1)
 
-    #############################################################################
-    # TODO: Finish the forward pass, and compute the loss. This should include  #
-    # both the data loss and L2 regularization for W1 and W2. Store the result  #
-    # in the variable loss, which should be a scalar. Use the Softmax           #
-    # classifier loss.                                                          #
-    #############################################################################
-    pass
     #############################################################################
     #                              END OF YOUR CODE                             #
     #############################################################################
@@ -133,7 +133,7 @@ class TwoLayerNet(object):
 
     grad_W2 = h.T.dot(grad_y_pred)
 
-    db2 = np.sum(grad_y_pred, axis=0) #porque mesmo?
+    db2 = np.sum(grad_y_pred, axis=0) #de: scores = np.dot(X, W) + b, db = np.sum(dscores, axis=0, keepdims=True)
 
     grad_h = grad_y_pred.dot(W2.T)
 
