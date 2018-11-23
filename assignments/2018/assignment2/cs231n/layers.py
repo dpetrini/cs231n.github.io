@@ -461,7 +461,36 @@ def conv_forward_naive(x, w, b, conv_param):
     # TODO: Implement the convolutional forward pass.                         #
     # Hint: you can use the function np.pad for padding.                      #
     ###########################################################################
-    pass
+    stride=conv_param['stride']
+    padding_size  = conv_param['pad']
+    HH, WW = w.shape[2], w.shape[3]
+    H, W = x.shape[2], x.shape[3]
+    N = x.shape[0]
+    F = w.shape[0]
+
+    H_, W_ = int(1 + (H + 2 * padding_size - HH) / stride), int(1 + (W + 2 * padding_size - WW) / stride)
+    
+    img_pad=np.pad(x, ((0,0),(0,0),(1,1),(1,1)), 'constant', constant_values=((0,0),(0,0),(0,0),(0,0)))
+
+    # below for a single image
+    #img_pad = np.pad(x, pad_width=padding_size, mode='constant', constant_values=0)
+
+    out = np.zeros((N, F, H_, W_))
+ 
+    # for each image in X
+    for n in range(N):
+        # convolve the image by the filters
+        for filter_num in range(w.shape[0]):
+            #print("Filter", filter_num)
+            filter_size = w.shape[2] # assume square filter, any dimension is same
+            # loop in two dimensions
+            for x_ in np.uint16(np.arange(0, 1+(H+2*padding_size - filter_size)/ stride)):            
+                for y_ in np.uint16(np.arange(0, 1+(W+2*padding_size - filter_size)/ stride)):
+                    # np broadcast acts like magic for channels(second parameter) auto multiply
+                    out[n, filter_num, x_, y_] = np.sum(img_pad[n, :, x_*stride: x_*stride+filter_size, y_*stride: y_*stride+filter_size] * w[filter_num, :, :, :])            
+        
+            out[n, filter_num, :, :] +=b [filter_num]
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -486,7 +515,60 @@ def conv_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the convolutional backward pass.                        #
     ###########################################################################
-    pass
+    x, w, b, conv_param = cache
+ 
+    stride=conv_param['stride']
+    padding_size  = conv_param['pad']
+    print(x.shape)
+    HH, WW = w.shape[2], w.shape[3]
+    H, W = x.shape[2], x.shape[3]
+    N = x.shape[0]
+    F = w.shape[0]
+    print(N,F)
+
+    H_, W_ = int(1 + (H + 2 * padding_size - HH) / stride), int(1 + (W + 2 * padding_size - WW) / stride)
+    
+    img_pad=np.pad(x, ((0,0),(0,0),(1,1),(1,1)), 'constant', constant_values=((0,0),(0,0),(0,0),(0,0)))
+
+    # below for a single image
+    #img_pad = np.pad(x, pad_width=padding_size, mode='constant', constant_values=0)
+
+    dw = np.zeros_like(w)
+    dx_pad = np.zeros_like(img_pad)
+    db = np.zeros_like(b)
+
+    # derivatives from chain rule
+    # dw = x.T.dot(dout)
+    # dx = dout.dot(W.T)
+    # db = np.sum(dout, axis=0)
+ 
+    # for each image in X
+    for n in range(N):
+        # convolve the image by the filters
+        for filter_num in range(w.shape[0]):
+            #print("Filter", filter_num)
+            filter_size = w.shape[2] # assume square filter, any dimension is same
+            # loop in two dimensions
+            for x_ in np.uint16(np.arange(0, 1+(H+2*padding_size - filter_size)/ stride)):            
+                for y_ in np.uint16(np.arange(0, 1+(W+2*padding_size - filter_size)/ stride)):
+
+                    #dw = x.T.dot(dout) - why only different order multiply works below
+                    dw[filter_num, :, :, :] +=  dout[n,   filter_num, x_, y_] * img_pad[n, :, x_*stride: x_*stride+filter_size, y_*stride: y_*stride+filter_size]
+
+                    #dx = dout.dot(W.T) - likewise...
+                    dx_pad[n, :, x_*stride: x_*stride+filter_size, y_*stride: y_*stride+filter_size] += w[filter_num, :, :, :] * dout[n,   filter_num, x_, y_]
+
+                    # why sum one on top of other?
+                    # from course notes:
+                    # "In practice during backpropagation, every neuron in the volume will compute the gradient for its weights, 
+                    #  but these gradients will be added up across each depth slice and only update a single set of weights per slice."
+
+            #out[n, filter_num, :, :] +=b [filter_num]
+
+            db[filter_num] += np.sum(dout[n, filter_num,  :, :])
+    
+    # remove padding
+    dx = dx_pad[:, :, padding_size: H+padding_size, padding_size: W+padding_size]
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
@@ -516,12 +598,32 @@ def max_pool_forward_naive(x, pool_param):
     ###########################################################################
     # TODO: Implement the max-pooling forward pass                            #
     ###########################################################################
-    pass
+    pool_height  = pool_param['pool_height']
+    pool_width  = pool_param['pool_width']
+    stride = pool_param['stride']
+
+    N = x.shape[0]
+    H = x.shape[2]
+    W = x.shape[3]
+    H_ = 1 + int((H - pool_height) / stride)
+    W_ = 1 + int((W - pool_width) / stride)
+
+    # prepare output
+    pool_out = np.zeros((N, x.shape[1],
+                        H_,
+                        W_
+                        ))
+    for n in range(N):                      # for each image
+        for map_num in range(x.shape[1]):   # for each "filter"
+            for r in np.arange(H_):         # x
+                for c in np.arange(W_):     # y
+                    pool_out[n, map_num, r, c] = np.max(x[n, map_num, r*stride:r*stride+pool_height, c*stride:c*stride+pool_width])
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
     cache = (x, pool_param)
-    return out, cache
+    return pool_out, cache
 
 
 def max_pool_backward_naive(dout, cache):
@@ -539,7 +641,20 @@ def max_pool_backward_naive(dout, cache):
     ###########################################################################
     # TODO: Implement the max-pooling backward pass                           #
     ###########################################################################
-    pass
+    x, pool_param = cache
+    pool_height  = pool_param['pool_height']
+    pool_width  = pool_param['pool_width']
+    stride = pool_param['stride']
+
+    N = x.shape[0]
+    H = x.shape[2]
+    W = x.shape[3]
+    H_ = 1 + int((H - pool_height) / stride)
+    W_ = 1 + int((W - pool_width) / stride)
+
+    ############### NA
+
+
     ###########################################################################
     #                             END OF YOUR CODE                            #
     ###########################################################################
