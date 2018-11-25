@@ -53,7 +53,15 @@ class ThreeLayerConvNet(object):
         # **the width and height of the input are preserved**. Take a look at      #
         # the start of the loss() function to see how that happens.                #                           
         ############################################################################
-        pass
+        self.params = {}
+        self.params['W1'] = weight_scale * np.random.randn(num_filters, input_dim[0], filter_size, filter_size)
+        self.params['b1'] = np.zeros(num_filters)
+        # divide by two below due to max pool 2x2
+        self.params['W2'] = weight_scale * np.random.randn(int(num_filters*input_dim[1]/2*input_dim[2]/2), hidden_dim)
+        self.params['b2'] = np.zeros(hidden_dim)
+        self.params['W3'] = weight_scale * np.random.randn(hidden_dim, num_classes)
+        self.params['b3'] = np.zeros(num_classes)  
+     
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -89,7 +97,23 @@ class ThreeLayerConvNet(object):
         # Remember you can use the functions defined in cs231n/fast_layers.py and  #
         # cs231n/layer_utils.py in your implementation (already imported).         #
         ############################################################################
-        pass
+
+        # First layer: conv
+        out_fast, cache_fast_conv = conv_forward_fast(X, W1, b1, conv_param)
+        # conv + relu
+        out_relu, relu_cache_conv = relu_forward(out_fast)
+        # conv + relu + max_pool
+        out_fast_max_pool, cache_fast_max_pool = max_pool_forward_fast(out_relu, pool_param)
+
+        # second layer affine forward pass + relu
+        out2, cache2 = affine_forward(out_fast_max_pool, W2, b2)
+        out_relu2, relu_cache2 = relu_forward(out2)
+
+        # third layer affine forward pass
+        out3, cache3 = affine_forward(out_relu2, W3, b3)
+
+        scores = out3
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
@@ -108,7 +132,66 @@ class ThreeLayerConvNet(object):
         # automated tests, make sure that your L2 regularization includes a factor #
         # of 0.5 to simplify the expression for the gradient.                      #
         ############################################################################
-        pass
+
+        # Compute the loss
+        loss = None
+        N = X.shape[0]
+
+        # SOFTMAX Loss - # compute the loss: average cross-entropy
+        exp_class_score=np.exp(scores)
+        exp_correct_class_score=exp_class_score[np.arange(N),y] 
+
+        #loss
+        loss=-np.log(exp_correct_class_score/np.sum(exp_class_score,axis=1))
+        loss=sum(loss)/N
+
+        # Regularization
+        loss += self.reg * np.sum(W3 * W3)
+        loss += self.reg * np.sum(W2 * W2)
+        loss += self.reg * np.sum(W1 * W1)
+
+        # Gradients
+        grad_y_pred = exp_class_score / np.sum(exp_class_score, axis=1,keepdims=True)
+        grad_y_pred[np.arange(N),y]-=1 # faltou
+        grad_y_pred/=N # faltou
+
+        dout = grad_y_pred
+
+        # Grads (backward pass)
+        # out layer
+        grad_h, grad_W3, db3 = affine_backward(dout, cache3)
+
+        # second layer
+        grad_relu_h = relu_backward(grad_h, relu_cache2)
+        dx1, grad_W2, db2 = affine_backward(grad_relu_h, cache2)
+
+        # Conv Max poll back
+        dconv_fast = max_pool_backward_fast(dx1, cache_fast_max_pool)
+
+        # Conv relu back
+        dconv_relu = relu_backward(dconv_fast, relu_cache_conv)
+   
+        # Conv back
+        dx_fast, dw_fast, db_fast = conv_backward_fast(dconv_relu, cache_fast_conv)   
+
+        grad_W1 = dw_fast
+        db1 = db_fast
+
+        # add regularization gradient contribution
+        grad_W3 += self.reg * W3
+        grad_W2 += self.reg * W2
+        grad_W1 += self.reg * W1
+
+        grads['W3'] = grad_W3
+        grads['b3'] = db3        
+        grads['W2'] = grad_W2
+        grads['b2'] = db2
+        grads['W1'] = grad_W1
+        grads['b1'] = db1
+        
+              
+
+
         ############################################################################
         #                             END OF YOUR CODE                             #
         ############################################################################
